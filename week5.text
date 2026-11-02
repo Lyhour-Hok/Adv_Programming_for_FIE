@@ -1,0 +1,174 @@
+
+==============================================================
+
+1. HUGGING FACE AND UNSLOTH
+--------------------------------------------------------------
+
+1.1 What is Hugging Face?
+Hugging Face (huggingface.co) is like a "GitHub for AI". It is a website
+and a community where people share AI models, datasets and demo apps for
+free. There are hundreds of thousands of pre-trained models, for text,
+image, audio and more, so we don't need to train a big model from zero.
+We can just download one and use it, or fine-tune it on our own data.
+
+Main parts of the website:
+- Models   : pre-trained models (e.g. BERT, GPT-2, Llama, Qwen, Whisper).
+- Datasets : ready-to-use datasets for training and testing.
+- Spaces   : small web demos of models (built with Gradio or Streamlit),
+             we can try a model directly in the browser.
+- Docs     : documentation of the libraries (transformers, datasets, ...).
+
+Main Python libraries:
+- transformers : load and use models.
+- datasets     : load and process datasets.
+- huggingface_hub : login, upload and download files from the Hub.
+
+1.2 How to use it
+- Search a model: go to "Models", type a name or filter by Task
+  (e.g. Text Classification, Translation, Text Generation), language,
+  library, and sort by "Most downloads" or "Trending".
+- Read the Model Card: it explains what the model does, how it was
+  trained, its limits, the license, and gives example code.
+- Try it online: many models have an "Inference" widget on the right
+  side, we can type text and see the result without coding.
+- "Use this model" button: gives the code to copy into Python.
+- Files and versions: see the weights and config files of the model.
+- Create an account -> Settings -> Access Tokens: create a token to
+  download private/gated models (like Llama) or upload our own models.
+
+1.3 What is Unsloth?
+Unsloth is an open-source library that makes fine-tuning LLMs (like
+Llama, Mistral, Gemma, Qwen) much faster and uses much less GPU memory.
+It is useful for students because we can fine-tune a model on a free
+GPU like Google Colab or Kaggle. It works together with Hugging Face:
+it loads models from the Hub and can push the fine-tuned model back.
+
+2. INTRODUCTION TO LLM MODELS
+--------------------------------------------------------------
+
+2.1 Model and Preprocessor
+To use a model we always need 2 things:
+- Preprocessor: changes our raw input into numbers the model can read.
+    * Tokenizer for text: cuts the text into tokens and changes them to
+      IDs (input_ids, attention_mask).
+    * Image processor for images (resize, normalize).
+    * Feature extractor for audio.
+    * Processor for multimodal models (text + image/audio).
+- Model: the neural network that takes these numbers and gives the
+  output (logits, generated text, labels...).
+
+    from transformers import AutoTokenizer, AutoModel
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+    model = AutoModel.from_pretrained("bert-base-uncased")
+    inputs = tokenizer("Hello world", return_tensors="pt")
+    outputs = model(**inputs)
+
+Important: the tokenizer and the model must come from the same
+checkpoint, otherwise the token IDs will not match.
+
+2.2 Model Selection
+How to choose the right model for our project:
+
+a) Task Alignment
+   The model must match our task. For example: text classification ->
+   BERT/RoBERTa, text generation / chatbot -> GPT, Llama, Qwen,
+   translation / summarization -> T5, BART, speech to text -> Whisper.
+   We can use the Task filter on Hugging Face.
+
+b) Model Architecture
+   - Encoder-only (BERT): good for understanding text (classification,
+     NER).
+   - Decoder-only (GPT, Llama): good for generating text.
+   - Encoder-decoder (T5, BART): good for input -> output tasks like
+     translation and summarization.
+
+c) Model Size and Complexity
+   Bigger model (more parameters, e.g. 70B) = usually better results,
+   but needs more GPU memory, is slower and costs more. A small model
+   (e.g. 1B, DistilBERT) is faster and can run on a laptop or Colab.
+   We must balance accuracy and our resources.
+
+d) Performance Benchmarking
+   Compare models with benchmarks and metrics (accuracy, F1, BLEU,
+   perplexity...), for example on leaderboards on Hugging Face.
+   Best is to also test the model on our own data.
+
+e) Community Support and Documentation
+   Choose a model with a good model card, many downloads/likes, good
+   documentation and an active community. It is easier to fix
+   problems and find tutorials. Also check the license (can we use it
+   for commercial work?).
+
+2.3 Model Loader
+The steps to load and prepare a model:
+
+a) Load Model Architecture
+   Read the config file (config.json) to build the structure of the
+   network: number of layers, hidden size, attention heads...
+       from transformers import AutoConfig
+       config = AutoConfig.from_pretrained("bert-base-uncased")
+
+b) Load Pretrained Weights
+   Download the trained parameters (.safetensors or .bin) and put them
+   into the architecture. from_pretrained() does a) and b) together.
+
+c) Initialize Model
+   Create the model object in memory, choose the device (CPU/GPU) and
+   the precision (float32, float16, 4-bit), and put it in eval mode for
+   inference.
+       model = AutoModel.from_pretrained("bert-base-uncased")
+       model.to("cuda")
+       model.eval()
+
+d) Configure for Tasks
+   Adapt the model to our task, e.g. add a classification head with the
+   number of labels, or set generation settings (max_new_tokens,
+   temperature).
+       AutoModelForSequenceClassification.from_pretrained(
+           "bert-base-uncased", num_labels=3)
+
+e) Integrate with Pipelines
+   pipeline() puts the preprocessor + model + postprocessing together
+   in one simple function.
+       from transformers import pipeline
+       gen = pipeline("text-generation", model="gpt2")
+       gen("Today at school I learned")
+
+f) Load from Sources
+   We can load a model from:
+   - the Hugging Face Hub (by name, e.g. "gpt2"),
+   - a local folder (after model.save_pretrained("my_model")),
+   - a private/gated repo using our access token (huggingface-cli login).
+
+
+3. SUMMARY OF AutoModel VARIANTS
+--------------------------------------------------------------
+"Auto" classes choose the right architecture automatically from the
+model name, so we don't need to know the exact class (BertModel,
+GPT2Model...). Each variant adds a different "head" for a task:
+
+| Class                               | Task                       | Example models  |
+|-------------------------------------|----------------------------|-----------------|
+| AutoModel                           | Base model, gives hidden   | BERT, RoBERTa   |
+|                                     | states / embeddings        |                 |
+| AutoModelForCausalLM                | Text generation, chatbot   | GPT-2, Llama    |
+| AutoModelForMaskedLM                | Fill in the blank [MASK]   | BERT            |
+| AutoModelForSeq2SeqLM               | Translation, summarization | T5, BART        |
+| AutoModelForSequenceClassification  | Sentiment, text classif.   | BERT, DistilBERT|
+| AutoModelForTokenClassification     | NER, POS tagging           | BERT            |
+| AutoModelForQuestionAnswering       | Find answer in a text      | BERT, RoBERTa   |
+| AutoModelForMultipleChoice          | Choose the best answer     | BERT            |
+| AutoModelForImageClassification     | Image classification       | ViT             |
+| AutoModelForSpeechSeq2Seq           | Speech to text             | Whisper         |
+
+Preprocessor "Auto" classes:
+- AutoTokenizer      -> text
+- AutoImageProcessor -> images
+- AutoFeatureExtractor -> audio
+- AutoProcessor      -> multimodal (text + image/audio)
+
+Conclusion: Today I learned that Hugging Face makes it very easy to find
+and use pre-trained models, and Unsloth helps to fine-tune LLMs faster
+with less memory. To use a model, we must choose it carefully (task,
+architecture, size, benchmark, community), then load it with the
+right Auto class and preprocessor, or simply use pipeline().
